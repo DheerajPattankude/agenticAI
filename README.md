@@ -1,27 +1,43 @@
-# agenticAI
-# 🧠 Multi-Agent AI Chat App (Streamlit)
+# 🌟 AI Multi-Agent Chat App
 
-This is a **colorful Streamlit-based AI chat application** with **three intelligent agents**:
+This is a Streamlit app with **3 AI Agents**:
+1. **Indian Institution Experience Officer**
+2. **Police Guideline Officer**
+3. **Lord Krishna** (wisdom from Bhagavad Gita & Mahabharata)
 
-1. 🎓 **Experience Advisor** – Answers based on experience in Indian institutions.  
-2. 👮 **Police Guidelines Officer** – Provides answers following Indian police rules and guidelines.  
-3. 🕉 **Lord Krishna** – Responds based on **Bhagavad Gita** and **Mahabharata** teachings.
-
-The app features a **custom colorful UI** for both the question bar and the answer area.
-
----
-
-## 🚀 Features
-- **3 Distinct AI Agents** with unique personalities.
-- **Beautiful UI** with background images, colors, and styled text.
-- **Instant answers** in the browser.
-- **Runs locally** or can be deployed publicly (Streamlit Cloud, Hugging Face Spaces, etc.).
+Each agent answers the same question in its own style.  
+The results can be **downloaded as a Word file**.
 
 ---
 
-## 🛠 Installation
+## 🚀 How to Run Locally
 
-### 1️⃣ Clone the Repository
-```bash
-git clone https://github.com/YOUR-USERNAME/YOUR-REPO.git
-cd YOUR-REPO
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/my_web_app.git
+   cd my_web_app
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Set your Hugging Face token:
+   ```bash
+   export HF_TOKEN=your_huggingface_api_token
+   ```
+
+4. Run the app:
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+---
+
+## 🌐 Deploy on Streamlit Cloud
+1. Push this code to GitHub.
+2. Go to [Streamlit Cloud](https://share.streamlit.io).
+3. Select your repo and branch.
+4. Add `HF_TOKEN` in **Secrets**.
+5. Deploy!
