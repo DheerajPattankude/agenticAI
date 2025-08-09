@@ -1,1 +1,5 @@
 pip install -r requirements.txt
+#Make sure requirements.txt contains:
+streamlit
+openai
+python-docx
