@@ -4,3 +4,4 @@ python-docx
 huggingface_hub
 transformers
 torch
+deep_translator
