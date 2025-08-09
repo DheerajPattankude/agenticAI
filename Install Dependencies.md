@@ -1,5 +1,6 @@
 pip install -r requirements.txt
 #Make sure requirements.txt contains:
-streamlit
-openai
-python-docx
+pip instal streamlit
+pip install openai
+pip install python-docx
+pip install deep_translator
