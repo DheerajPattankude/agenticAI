@@ -1,5 +1,6 @@
 pip install -r requirements.txt
 #Make sure requirements.txt contains:
+--upgrade pip,
 streamlit,
 openai,
 python-docx,
