@@ -14,4 +14,16 @@ pydub
 numpy
 av
 python-docx
+ffmpeg
+libavdevice-dev
+libavfilter-dev
+libopus-dev
+libvpx-dev
+pkg-config
+libavformat-dev
+libavcodec-dev
+libswresample-dev
+libswscale-dev
+libavutil-dev
+portaudio19-dev
 
