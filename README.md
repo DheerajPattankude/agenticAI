@@ -42,5 +42,6 @@ venv\Scripts\activate         # On Windows
 
 ### 3. Install dependencies
 ```bash
+apt-get update && apt-get install -y ffmpeg libavdevice-dev libavformat-dev libavcodec-dev libavutil-dev libswresample-dev libswscale-dev
 pip install -r requirements.txt
 
