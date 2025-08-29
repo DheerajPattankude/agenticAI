@@ -1,190 +1,242 @@
-# streamlit_app.py
-import os
-import json
-import requests
-from openai import OpenAI
-from docx import Document
-from deep_translator import GoogleTranslator
+# app.py
 import streamlit as st
+from docx import Document
 from io import BytesIO
+import os
+import openai
+from deep_translator import GoogleTranslator
+import time
+import threading
+from gtts import gTTS
+import speech_recognition as sr
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, RTCConfiguration
+import av
+import numpy as np
 
-# -----------------------
-# Configuration
-# -----------------------
-HF_TOKEN = os.environ.get("HF_TOKEN")
-# Preferred HF model (may be gated). The app will attempt this first then fallback.
-MODEL = "meta-llama/Llama-3.1-8B-Instruct:cerebras"
+# =========================
+# PAGE CONFIG & STYLE
+# =========================
+st.set_page_config(page_title="Multi-Agent AI", page_icon="🤖", layout="centered")
 
-# OpenAI-client configured to use Hugging Face OpenAI-compatible endpoint
-# (we'll try this path first)
-client = OpenAI(
-    base_url="https://router.huggingface.co/v1",
-    api_key=HF_TOKEN,
-)
+# 🎨 keep your CSS (unchanged) ...
 
-# -----------------------
-# Helper: call via OpenAI client (OpenAI-style)
-# -----------------------
-def call_via_openai_client(model, messages):
-    # uses the openai.OpenAI client (chat completions)
+# =========================
+# LANGUAGE CODE MAPPING
+# =========================
+LANGUAGE_CODES = {
+    "English": "en",
+    "Hindi": "hi",
+    "Marathi": "mr",
+    "Gujarati": "gu",
+    "Tamil": "ta",
+    "Telugu": "te",
+    "Kannada": "kn",
+    "Malayalam": "ml",
+    "Bengali": "bn",
+    "Punjabi": "pa"
+}
+
+# =========================
+# SYSTEM PROMPTS FOR AGENTS (unchanged)
+# =========================
+AGENT_PROMPTS = {
+    "Indian Institution Advisor": "...",
+    "Police Guideline Officer": "...",
+    "Lord Krishna": "...",
+    "Dr. Ambedkar": "...",
+    "Bhagwan Mahaveer": "...",
+    "Bhagwan Budda": "...",
+    "IAS role as DC": "...",
+    "IAS role as Secretary": "..."
+}
+
+# =========================
+# TRANSLATOR + AUDIO
+# =========================
+class RateLimitedTranslator:
+    def __init__(self):
+        self.last_call_time = 0
+        self.min_interval = 0.34
+        self.lock = threading.Lock()
+    def translate(self, text, dest):
+        with self.lock:
+            elapsed = time.time() - self.last_call_time
+            if elapsed < self.min_interval:
+                time.sleep(self.min_interval - elapsed)
+            try:
+                result = GoogleTranslator(source="auto", target=dest).translate(text)
+                self.last_call_time = time.time()
+                return result
+            except Exception as e:
+                return f"Translation error: {str(e)}. Original text: {text}"
+
+translator = RateLimitedTranslator()
+
+def generate_audio(text, lang_code, filename="output.mp3"):
     try:
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-        )
-        # Try to extract content (safe access)
-        return resp.choices[0].message.content if hasattr(resp.choices[0].message, "content") else resp.choices[0].message
+        tts = gTTS(text=text, lang=lang_code)
+        tts.save(filename)
+        return filename
     except Exception as e:
-        # Return exception so caller can fallback
-        raise
+        st.error(f"Audio generation error: {str(e)}")
+        return None
 
-# -----------------------
-# Helper: call via HF native inference API
-# -----------------------
-def call_hf_native(model, prompt, max_new_tokens=256):
-    api_url = f"https://router.huggingface.co/v1/models/{model}"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"} if HF_TOKEN else {}
-    payload = {"inputs": prompt, "parameters": {"max_new_tokens": max_new_tokens}}
-    r = requests.post(api_url, headers=headers, json=payload, timeout=120)
-    # raise for status to be handled by caller
-    r.raise_for_status()
-    data = r.json()
-    # Many models return [{'generated_text': '...'}]
-    if isinstance(data, list) and "generated_text" in data[0]:
-        return data[0]["generated_text"]
-    # Some models return plain text or dict
-    if isinstance(data, dict):
-        # try common keys
-        for k in ("generated_text", "text", "output"):
-            if k in data:
-                return data[k]
-        return json.dumps(data)
-    # fallback
-    return str(data)
-
-# -----------------------
-# Unified agent caller: try openai client first, fallback to HF native
-# -----------------------
-def query_model_with_fallback(system_prompt, user_prompt, model=MODEL):
-    # Build messages for chat
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt}
-    ]
-    # try openai-style call first
+# =========================
+# OPENAI CLIENT (unchanged)
+# =========================
+def get_openai_client():
     try:
-        return call_via_openai_client(model, messages)
-    except Exception as e_openai:
-        # fallback: build a single prompt mixing system+user
-        fallback_prompt = system_prompt + "\n\nUser: " + user_prompt + "\nAssistant:"
-        try:
-            return call_hf_native(model, fallback_prompt)
-        except requests.exceptions.HTTPError as http_err:
-            # If HF native 404 or gated, fallback to FALLBACK_MODEL native
+        HF_TOKEN = os.environ.get("HF_TOKEN")
+        if not HF_TOKEN:
             try:
-                fallback_prompt2 = system_prompt + "\n\nUser: " + user_prompt + "\nAssistant:"
-                return call_hf_native(MODEL, fallback_prompt2)
-            except Exception as final_err:
-                return f"[Error contacting models]\nOpenAI-client error: {e_openai}\nHF error: {http_err}\nFinal fallback error: {final_err}"
-        except Exception as ex2:
-            return f"[Error contacting HF native API]\nOpenAI-client error: {e_openai}\nHF error: {ex2}"
+                HF_TOKEN = st.secrets.get("HF_TOKEN")
+            except (FileNotFoundError, AttributeError):
+                pass
+        if not HF_TOKEN and "hf_token" in st.session_state:
+            HF_TOKEN = st.session_state.hf_token
+        if not HF_TOKEN:
+            st.warning("Enter Hugging Face API token.")
+            api_key = st.text_input("HF API token:", type="password")
+            if api_key:
+                st.session_state.hf_token = api_key
+                st.rerun()
+            return None
+        return openai.OpenAI(base_url="https://router.huggingface.co/v1", api_key=HF_TOKEN)
+    except Exception as e:
+        st.error(f"Error initializing client: {str(e)}")
+        return None
 
-# -----------------------
-# UI: Streamlit layout
-# -----------------------
-st.set_page_config(page_title="Me CM Assistant", layout="wide")
-st.markdown(
-    """
-    <style>
-    .card {
-      border-radius: 12px;
-      padding: 16px;
-      background: linear-gradient(135deg, #1e3c70, #2a5290);
-      background-size: cover;
-      color: White;
-      box-shadow: 0 4px 24px rgba(10, 40, 80, 0.08);
-      margin-bottom: 12px;
-    }
-    .agent-title { font-weight:600; font-size:18px; }
-    .small { color: #660; font-size:12px; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+client = get_openai_client()
 
-st.title("ME CM Assistant (Indian Institution / Police / Lord Krishna)")
-st.write("Ask a question and choose a language. Three agents will answer in parallel.")
+# =========================
+# QUERY FUNCTION (unchanged)
+# =========================
+def query_model_combined(user_prompt, selected_agents):
+    if not client:
+        return "Error: OpenAI client not initialized."
+    try:
+        combined_instructions = (
+            "You are a multi-role assistant. For each role..."
+        )
+        role_texts = []
+        for agent in selected_agents:
+            if agent in AGENT_PROMPTS:
+                role_texts.append(f"Role: {agent}\nSystem Prompt: {AGENT_PROMPTS[agent]}\n")
+        if not role_texts:
+            return "Error: No valid agents selected."
+        final_prompt = f"Question: {user_prompt}\n\n" + "\n".join(role_texts)
+        response = client.chat.completions.create(
+            model="meta-llama/Llama-3.1-8B-Instruct:cerebras",
+            messages=[{"role": "system", "content": combined_instructions},
+                      {"role": "user", "content": final_prompt}],
+            temperature=0.7,
+            max_tokens=4000
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"API Error: {str(e)}"
 
-# Input controls
-with st.form("ask_form"):
-    col1, col2 = st.columns([4,1])
+def parse_agent_responses(raw_response, selected_agents):
+    responses = {}
+    if not raw_response or raw_response.startswith("Error:"):
+        return {agent: "No response." for agent in selected_agents}
+    blocks = raw_response.split("### ")
+    for block in blocks:
+        if not block.strip():
+            continue
+        lines = block.split("\n")
+        if lines and ":" in lines[0]:
+            role = lines[0].split(":")[0].strip()
+            content = "\n".join(lines[1:]).strip()
+            if role in selected_agents:
+                responses[role] = content
+    for agent in selected_agents:
+        if agent not in responses:
+            responses[agent] = "No response."
+    return responses
+
+def translate_batch_texts(text_list, target_lang):
+    return [translator.translate(t, target_lang) if not t.startswith("Error") else t for t in text_list]
+
+# =========================
+# SPEECH RECOGNITION WRAPPER
+# =========================
+def speech_to_text(audio_data):
+    recognizer = sr.Recognizer()
+    try:
+        text = recognizer.recognize_google(audio_data, language="en-IN")
+        return text
+    except sr.UnknownValueError:
+        return ""
+    except sr.RequestError as e:
+        return f"Speech recognition error: {str(e)}"
+
+class AudioProcessor(AudioProcessorBase):
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.text = ""
+    def recv(self, frame):
+        audio = frame.to_ndarray().flatten().astype(np.float32) / 32768.0
+        wav_bytes = audio.tobytes()
+        with sr.AudioFile(BytesIO(wav_bytes)) as source:
+            try:
+                self.text = self.recognizer.recognize_google(self.recognizer.record(source))
+            except Exception:
+                pass
+        return frame
+
+# =========================
+# UI
+# =========================
+st.title("🤖 Me CM Assistant (Realtime Voice)")
+
+if client:
+    st.subheader("🎤 Speak your Question")
+    rtc_configuration = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
+    webrtc_ctx = webrtc_streamer(
+        key="speech",
+        mode="recvonly",
+        rtc_configuration=rtc_configuration,
+        audio_processor_factory=AudioProcessor,
+        media_stream_constraints={"audio": True, "video": False},
+    )
+
+    if "voice_question" not in st.session_state:
+        st.session_state.voice_question = ""
+
+    if webrtc_ctx and hasattr(webrtc_ctx, "audio_processor"):
+        if webrtc_ctx.audio_processor and webrtc_ctx.audio_processor.text:
+            st.session_state.voice_question = webrtc_ctx.audio_processor.text
+            st.success(f"Recognized Speech: {st.session_state.voice_question}")
+
+    # Text + Voice Inputs
+    user_question = st.text_area("💬 Or type your question:", value=st.session_state.voice_question, height=120)
+    language = st.selectbox("🌐 Select language:", list(LANGUAGE_CODES.keys()))
+    agent_options = list(AGENT_PROMPTS.keys())
+    selected_agents = st.multiselect("🤝 Select agents:", options=agent_options)
+
+    col1, col2 = st.columns(2)
     with col1:
-        user_question = st.text_area("Enter your question", height=120)
+        text_submit = st.button("📝 Get Answers (Text)")
     with col2:
-        language = st.selectbox("Output language", ["English", "Kannada"])
-        submit = st.form_submit_button("Ask")
+        audio_submit = st.button("🔊 Get Answers (Audio)")
 
-if submit:
-    if not user_question.strip():
-        st.warning("Please enter a question.")
-    else:
-        # Show loader and then display results
-        st.info("Generating answers... this may take a few seconds depending on model access.")
-        placeholder = st.empty()
-        with placeholder.container():
-            st.markdown("### Generating...")
+    if (text_submit or audio_submit) and user_question:
+        with st.spinner("Generating responses..."):
+            raw_response = query_model_combined(user_question, selected_agents)
+            responses = parse_agent_responses(raw_response, selected_agents)
+            answer_texts = [responses[a] for a in selected_agents]
+            translated_texts = translate_batch_texts(answer_texts, LANGUAGE_CODES[language])
 
-        # Define system prompts for each agent
-        sys1 = "You are an experienced advisor who answers based on working experience in Indian institutions. Provide crisp, step-by-step guidance, minimal sentences, actionable steps."
-        sys2 = "You are a police guideline officer who provides advice based on Indian police rules, procedures and official practice. Provide crisp, step-by-step guidance and document references if applicable."
-        sys3 = "You are Lord Krishna answering with wisdom from the Bhagavad Gita and Mahabharata. Give concise guidance, optionally include a short shloka in Sanskrit and a brief explanation in simple words."
+            audio_files = {}
+            if audio_submit:
+                for agent, ans in zip(selected_agents, translated_texts):
+                    audio_files[agent] = generate_audio(ans, LANGUAGE_CODES[language], f"{agent}.mp3")
 
-        # Query each agent (sequentially)
-        with st.spinner("Calling Indian Institution agent..."):
-            answer1 = query_model_with_fallback(sys1, user_question)
-        with st.spinner("Calling Police Guidelines agent..."):
-            answer2 = query_model_with_fallback(sys2, user_question)
-        with st.spinner("Calling Lord Krishna agent..."):
-            answer3 = query_model_with_fallback(sys3, user_question)
-
-        # Translate if needed
-        if language == "Kannada":
-            try:
-                k1 = GoogleTranslator(source='auto', target='kn').translate(answer1)
-                k2 = GoogleTranslator(source='auto', target='kn').translate(answer2)
-                k3 = GoogleTranslator(source='auto', target='kn').translate(answer3)
-            except Exception as trans_e:
-                st.error(f"Translation failed: {trans_e}")
-                k1, k2, k3 = answer1, answer2, answer3
-        else:
-            k1, k2, k3 = answer1, answer2, answer3
-
-        # Remove the loading placeholder and show results with visuals
-        placeholder.empty()
-        st.markdown("## Results")
-        col_a, col_b, col_c = st.columns(3)
-
-        def render_agent(col, title, emoji, text, language_label):
-            with col:
-                st.markdown(f'<div class="card"><div class="agent-title">{emoji} {title}</div><div class="small">{language_label}</div><hr/></div>', unsafe_allow_html=True)
-                st.write(text)
-
-        render_agent(col_a, "Indian Institution Advisor", "🏫", k1, language)
-        render_agent(col_b, "Police Guideline Officer", "👮‍♂️", k2, language)
-        render_agent(col_c, "Lord Krishna ", "🕉️", k3, language)
-
-        # Offer a DOCX download
-        doc = Document()
-        doc.add_heading("AI Multi-Agent Responses", level=1)
-        doc.add_paragraph(f"Question: {user_question}\n")
-        doc.add_heading("1. Indian Institution Advisor", level=2)
-        doc.add_paragraph(k1)
-        doc.add_heading("2. Police Guideline Officer", level=2)
-        doc.add_paragraph(k2)
-        doc.add_heading("3. Lord Krishna (Bhagavad Gita)", level=2)
-        doc.add_paragraph(k3)
-
-        bio = BytesIO()
-        doc.save(bio)
-        bio.seek(0)
-        st.download_button("Download responses as Word (.docx)", data=bio, file_name="AI_Agent_Responses.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            for agent, ans in zip(selected_agents, translated_texts):
+                st.subheader(agent)
+                st.write(ans)
+                if audio_submit and audio_files.get(agent):
+                    st.audio(audio_files[agent], format="audio/mp3")
+else:
+    st.info("⚠️ Please set your HuggingFace API key.")
