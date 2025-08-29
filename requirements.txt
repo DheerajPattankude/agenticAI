@@ -1,7 +1,18 @@
-streamlit
-openai
-python-docx
-huggingface_hub
-transformers
-torch
-deep_translator
+
+---
+
+## ✅ requirements.txt  
+
+```txt
+streamlit==1.38.0
+streamlit-webrtc==0.47.7
+openai==1.40.3
+python-dotenv==1.0.1
+deep-translator==1.11.4
+gTTS==2.5.3
+speechrecognition==3.10.4
+pydub==0.25.1
+numpy==1.26.4
+av==12.3.0
+python-docx==1.1.2
+
