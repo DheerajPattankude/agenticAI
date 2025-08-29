@@ -32,6 +32,7 @@ This is a **Streamlit-based Multi-Agent AI Assistant** with:
 ```bash
 git clone https://github.com/your-username/mecm-assistant.git
 cd mecm-assistant
+pip install --upgrade pip
 
 ### 2. Create virtual environment
 ```bash
