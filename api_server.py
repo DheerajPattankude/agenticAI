@@ -195,7 +195,7 @@ if client:
     rtc_configuration = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
     webrtc_ctx = webrtc_streamer(
         key="speech",
-        mode="recvonly",
+        mode=WebRtcMode.RECVONLY,
         rtc_configuration=rtc_configuration,
         audio_processor_factory=AudioProcessor,
         media_stream_constraints={"audio": True, "video": False},
@@ -240,3 +240,4 @@ if client:
                     st.audio(audio_files[agent], format="audio/mp3")
 else:
     st.info("⚠️ Please set your HuggingFace API key.")
+
