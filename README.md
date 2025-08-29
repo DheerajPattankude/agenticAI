@@ -1,43 +1,45 @@
-# 🌟 AI Multi-Agent Chat App
+# 🤖 Me CM Assistant (Realtime Voice AI)
 
-This is a Streamlit app with **3 AI Agents**:
-1. **Indian Institution Experience Officer**
-2. **Police Guideline Officer**
-3. **Lord Krishna** (wisdom from Bhagavad Gita & Mahabharata)
-
-Each agent answers the same question in its own style.  
-The results can be **downloaded as a Word file**.
+This is a **Streamlit-based Multi-Agent AI Assistant** with:
+- 🎤 **Realtime Voice Input** (via microphone, `streamlit-webrtc`)
+- 💬 **Multi-Agent Text Responses** (Hugging Face models via OpenAI client wrapper)
+- 🔊 **Voice Output** (answers spoken using Google TTS `gTTS`)
+- 🌐 **Multilingual Support** (via `deep-translator`)
 
 ---
 
-## 🚀 How to Run Locally
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/my_web_app.git
-   cd my_web_app
-   ```
-
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Set your Hugging Face token:
-   ```bash
-   export HF_TOKEN=your_huggingface_api_token
-   ```
-
-4. Run the app:
-   ```bash
-   streamlit run streamlit_app.py
-   ```
+## 🚀 Features
+- Ask questions by **voice or text**
+- Get answers from multiple personas:
+  - Indian Institution Advisor
+  - Police Guideline Officer
+  - Lord Krishna
+  - Dr. Ambedkar
+  - Bhagwan Mahaveer
+  - Bhagwan Budda
+  - IAS role as DC
+  - IAS role as Secretary
+- **Download answers as Word document**
+- Supports multiple Indian languages (Hindi, Marathi, Tamil, Telugu, Bengali, etc.)
+- **Realtime transcription** of speech to text
+- **Spoken answers** using `gTTS`
 
 ---
 
-## 🌐 Deploy on Streamlit Cloud
-1. Push this code to GitHub.
-2. Go to [Streamlit Cloud](https://share.streamlit.io).
-3. Select your repo and branch.
-4. Add `HF_TOKEN` in **Secrets**.
-5. Deploy!
+## 🛠️ Installation
+
+### 1. Clone this repo
+```bash
+git clone https://github.com/your-username/mecm-assistant.git
+cd mecm-assistant
+
+### 2. Create virtual environment
+```bash
+python -m venv venv
+source venv/bin/activate      # On Linux/Mac
+venv\Scripts\activate         # On Windows
+
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
+
