@@ -9,7 +9,7 @@ import time
 import threading
 from gtts import gTTS
 import speech_recognition as sr
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, RTCConfiguration
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, RTCConfiguration, WebRtcMode
 import av
 import numpy as np
 
@@ -240,4 +240,5 @@ if client:
                     st.audio(audio_files[agent], format="audio/mp3")
 else:
     st.info("⚠️ Please set your HuggingFace API key.")
+
 
