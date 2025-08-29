@@ -2,7 +2,7 @@
 
 
 ## ✅ requirements.txt  
-upgrade pip
+ pip
 streamlit
 streamlit-webrtc
 openai
